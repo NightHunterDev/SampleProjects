@@ -6,9 +6,9 @@ using System.Collections.Generic;
 public class FacilityAmbience : MonoBehaviour
 {
     [Header("Settings")]
-    public AudioSource audioSource;          // The audio source to play the clips
-    public List<AudioClip> audioClips;       // List of audio clips to choose from
-    public float audioClipCooldown = 5f;     // Time to wait before playing the next clip
+    public AudioSource audioSource;          
+    public List<AudioClip> audioClips;       // List of Audio Clips to Play
+    public float audioClipCooldown = 5f;     // Time Waiting Between Each Audio Clip
 
     void Start()
     {
@@ -27,12 +27,12 @@ public class FacilityAmbience : MonoBehaviour
     {
         while (true)
         {
-            // Pick a random audio clip
+            // This Pick's a random Audio Clip
             int randomClipIndex = Random.Range(0, audioClips.Count);
             audioSource.clip = audioClips[randomClipIndex];
             audioSource.Play();
 
-            // Wait for the clip to finish and the cooldown
+            // Wait Until The Clip Finish 
             yield return new WaitForSeconds(audioSource.clip.length + audioClipCooldown);
         }
     }
