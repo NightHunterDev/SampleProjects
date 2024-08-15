@@ -8,13 +8,13 @@ public class PlayerSanity : MonoBehaviour
     public float sanity = 0;
     public float sanityIncreaseRate = 10f;
     public float maxSanity = 100f;
-    public float sanityIncreaseDelay = 1f; // Delay for gradual sanity increase
+    public float sanityIncreaseDelay = 1f; 
     private float sanityIncreaseTimer = 0f;
 
     [Header("Camera")]
     public Camera playerCamera;
-    public float increasedFOV60 = 65f;  // Increased FOV when sanity reaches 60
-    public float increasedFOV100 = 70f; // Increased FOV when sanity reaches 100
+    public float increasedFOV60 = 65f;  
+    public float increasedFOV100 = 70f; 
 
     [Header("Post Processing Effects")]
     public Volume postProcessVolume;
@@ -42,7 +42,7 @@ public class PlayerSanity : MonoBehaviour
     private bool isSanity100Triggered = false;
     private Vector3 originalCameraPosition;
     private float sanity100Timer = 0f;
-    private const float sanity100Duration = 40f;  // Duration in seconds
+    private const float sanity100Duration = 40f;  
 
     private void Start()
     {
@@ -89,17 +89,17 @@ public class PlayerSanity : MonoBehaviour
     {
         if (IsLookingBack())
         {
-            // Increase sanity gradually over time
+            
             sanityIncreaseTimer += Time.deltaTime;
             if (sanityIncreaseTimer >= sanityIncreaseDelay)
             {
                 IncreaseSanity();
-                sanityIncreaseTimer = 0f; // Reset the timer
+                sanityIncreaseTimer = 0f; 
             }
         }
         else
         {
-            sanityIncreaseTimer = 0f; // Reset the timer if not looking back
+            sanityIncreaseTimer = 0f; 
         }
 
         if (sanity >= 10 && sanity < 50)
@@ -115,7 +115,7 @@ public class PlayerSanity : MonoBehaviour
 
         if (sanity >= 60 && sanity < 100)
         {
-            // Increase FOV when sanity reaches 60 but not yet 100
+            
             if (playerCamera != null)
             {
                 playerCamera.fieldOfView = Mathf.Lerp(playerCamera.fieldOfView, increasedFOV60, Time.deltaTime * 2f);
@@ -135,17 +135,17 @@ public class PlayerSanity : MonoBehaviour
 
     private bool IsLookingBack()
     {
-        // Check if the player's camera is looking backward along the Y-axis
+       
         Vector3 cameraForward = playerCamera.transform.forward;
         Vector3 cameraUp = playerCamera.transform.up;
 
-        // Dot product to check if the camera is facing backwards along Y-axis
+       
         if (Vector3.Dot(cameraForward, Vector3.down) > 0.5f)
         {
-            return true; // Looking backward
+            return true; 
         }
 
-        return false; // Not looking backward
+        return false; 
     }
 
     private void IncreaseSanity()
@@ -199,13 +199,13 @@ public class PlayerSanity : MonoBehaviour
             sanity100ReverbFilter.reverbPreset = AudioReverbPreset.Psychotic;
         }
 
-        // Increase FOV
+        
         if (playerCamera != null)
         {
             playerCamera.fieldOfView = increasedFOV100;
         }
 
-        // Adjust Color Adjustments
+        
         if (colorAdjustments != null)
         {
             colorAdjustments.saturation.value = Mathf.Lerp(colorAdjustments.saturation.value, -100f, Time.deltaTime * 2f);
@@ -225,40 +225,40 @@ public class PlayerSanity : MonoBehaviour
     {
         isSanity100Triggered = false;
 
-        // Stop sanity 100 audio
+        
         if (sanity100AudioSource != null)
         {
             sanity100AudioSource.Stop();
         }
 
-        // Reset vignette effect
+        
         if (vignette != null)
         {
             vignette.intensity.value = Mathf.Lerp(vignette.intensity.value, 0f, Time.deltaTime * 2f);
         }
 
-        // Reset color adjustments
+        
         if (colorAdjustments != null)
         {
             colorAdjustments.saturation.value = Mathf.Lerp(colorAdjustments.saturation.value, originalSaturation, Time.deltaTime * 2f);
         }
 
-        // Fade out sanity increase audio
+        
         if (audioSource != null)
         {
             StartCoroutine(FadeOutAudio(audioSource, 2f));
         }
 
-        // Reset reverb filter to default
+        
         if (audioReverbFilter != null)
         {
             audioReverbFilter.reverbPreset = AudioReverbPreset.Off;
         }
 
-        // Reset FOV
+        
         if (playerCamera != null)
         {
-            playerCamera.fieldOfView = 60f; // Set to your default FOV
+            playerCamera.fieldOfView = 60f; 
         }
     }
 
