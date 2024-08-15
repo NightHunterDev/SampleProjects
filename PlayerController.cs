@@ -1,6 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
-using TMPro; // Ensure you have TextMeshPro imported
+using TMPro; 
 using System.Collections;
 
 public class PlayerController : MonoBehaviour
@@ -8,16 +8,16 @@ public class PlayerController : MonoBehaviour
     [Header("Movement Settings")]
     public float walkSpeed = 6.0f;
     public float sprintSpeed = 12.0f;
-    public float crouchSpeed = 3.0f; // Crouch speed
+    public float crouchSpeed = 3.0f; 
     public float jumpSpeed = 8.0f;
     public float gravity = 20.0f;
     public float airControlFactor = 0.5f;
 
 
-    // Player Scale
+    // This Can Be Used To Change Player Scale By Commands
     [Header("Player Scale")]
-    public GameObject playerObject; // Reference to the player GameObject
-    public Vector3 playerScale = new Vector3(1, 1, 1); // Default scale
+    public GameObject playerObject; 
+    public Vector3 playerScale = new Vector3(1, 1, 1); 
 
 
     [Header("Mouse Settings")]
@@ -30,16 +30,16 @@ public class PlayerController : MonoBehaviour
     public AudioSource footstepSource;
     public float walkFootstepInterval = 0.5f;
     public float sprintFootstepInterval = 0.3f;
-    public float crouchFootstepInterval = 0.6f; // Crouch footstep interval
+    public float crouchFootstepInterval = 0.6f; 
 
     [Header("Stamina Settings")]
-    public Slider staminaSlider; // Stamina slider UI element
-    public GameObject staminaUI; // GameObject containing the stamina slider and its fill image
+    public Slider staminaSlider; 
+    public GameObject staminaUI; 
     public float maxStamina = 11.0f;
     public float staminaRegenRate = 1.0f;
     public float staminaFadeDuration = 0.5f;
     public float jumpStaminaCost = 1.0f;
-    public float staminaThreshold = 0.159f; // Threshold to allow sprinting again
+    public float staminaThreshold = 0.159f; // Threshold to allow player to sprint again
 
     [Header("Class & Spawning Animation")]
     public AnimationClip spawningAnimation;
@@ -47,27 +47,27 @@ public class PlayerController : MonoBehaviour
     public AudioSource spawningAudioSource;
 
     [Header("Player List")]
-    public GameObject playerListUI; // GameObject containing the player list UI
+    public GameObject playerListUI; 
     public float playerListFadeDuration = 0.5f;
 
     [Header("Third Person Player Model")]
-    public Animator playerAnimator; // Animator for the third-person player model
-    public float smoothTransitionSpeed = 5.0f; // Speed of smooth transition between animations
-    public float animationSpeed = 1.0f; // Speed of the animations
+    public Animator playerAnimator; 
+    public float smoothTransitionSpeed = 5.0f; // Speed of smooth transition between animations in the blend tree
+    public float animationSpeed = 1.0f; 
 
 
     [Header("Door Controller")]
-    public Animator doorAnimator; // Animator for the door
-    public AudioSource doorAudioSource; // Audio source for the door
-    public AudioClip openDoorClip; // Audio clip to play when the door opens
-    public AudioClip closeDoorClip; // Audio clip to play when the door closes
-    private bool isDoorOpen = false; // Track the door's state
-    private bool isAnimating = false; // Track if an animation is currently playing
+    public Animator doorAnimator; 
+    public AudioSource doorAudioSource; 
+    public AudioClip openDoorClip; 
+    public AudioClip closeDoorClip; 
+    private bool isDoorOpen = false; 
+    private bool isAnimating = false; 
 
     [Header("Health & Death")]
     public float maxHealth = 100.0f;
-    public Slider healthSlider; // Health slider UI element
-    public TextMeshProUGUI healthText; // Health text UI element
+    public Slider healthSlider; 
+    public TextMeshProUGUI healthText; 
     private float currentHealth;
 
     private CharacterController controller;
@@ -78,8 +78,8 @@ public class PlayerController : MonoBehaviour
     private float currentStamina;
     private bool isSprinting;
     private bool isCrouching;
-    private CanvasGroup staminaCanvasGroup; // Used for fading in and out
-    private CanvasGroup playerListCanvasGroup; // Used for player list UI fading
+    private CanvasGroup staminaCanvasGroup; 
+    private CanvasGroup playerListCanvasGroup; 
     private float currentLeanAngle = 0.0f;
 
 
@@ -92,7 +92,7 @@ public class PlayerController : MonoBehaviour
         staminaSlider.maxValue = maxStamina;
         staminaSlider.value = maxStamina;
 
-        // Initialize health
+        
         currentHealth = maxHealth;
         healthSlider.maxValue = maxHealth;
         healthSlider.value = currentHealth;
@@ -100,10 +100,10 @@ public class PlayerController : MonoBehaviour
 
 
 
-        // Lock cursor
+        
         Cursor.lockState = CursorLockMode.Locked;
 
-        // Play spawning animation and audio
+        // Play Spawn animation and audio
         if (spawningAnimation != null)
         {
             GetComponent<Animator>().Play(spawningAnimation.name);
@@ -114,7 +114,7 @@ public class PlayerController : MonoBehaviour
             spawningAudioSource.Play();
         }
 
-        // Initialize CanvasGroups
+        
         if (staminaUI != null)
         {
             staminaCanvasGroup = staminaUI.GetComponent<CanvasGroup>();
@@ -130,13 +130,13 @@ public class PlayerController : MonoBehaviour
             playerListCanvasGroup = playerListUI.GetComponent<CanvasGroup>();
             if (playerListCanvasGroup == null)
             {
-                // If CanvasGroup is not attached, add one
+                
                 playerListCanvasGroup = playerListUI.AddComponent<CanvasGroup>();
             }
-            playerListCanvasGroup.alpha = 0; // Start with player list hidden
+            playerListCanvasGroup.alpha = 0; 
         }
 
-        // Set the animator speed
+       
         if (playerAnimator != null)
         {
             playerAnimator.speed = animationSpeed;
@@ -149,7 +149,7 @@ public class PlayerController : MonoBehaviour
             doorAnimator.SetBool("IsIdle", true);
         }
 
-        // Set the player GameObject scale at the start of the game
+        // Set the player  scale at the start of the game
         if (playerObject != null)
         {
             playerObject.transform.localScale = playerScale;
@@ -164,17 +164,17 @@ public class PlayerController : MonoBehaviour
         HandleStamina();
         HandlePlayerList();
         HandleAnimations();
-        HandleHealthAndDeath(); // Handle health and death in Update
+        HandleHealthAndDeath(); 
         HandleDoorControl();
 
-        // Check if the animation has finished playing to reset the flag
+        
         if (isAnimating && !doorAnimator.GetCurrentAnimatorStateInfo(0).IsName("Opening") &&
             !doorAnimator.GetCurrentAnimatorStateInfo(0).IsName("Closing"))
         {
             isAnimating = false;
         }
 
-        // If you want to allow runtime scaling, you can add it here
+        
         if (playerObject != null)
         {
             playerObject.transform.localScale = playerScale;
@@ -192,7 +192,7 @@ public class PlayerController : MonoBehaviour
 
         if (isCrouching)
         {
-            currentSpeed = crouchSpeed; // Use crouch speed
+            currentSpeed = crouchSpeed; 
         }
         else if (Input.GetKey(KeyCode.LeftShift) && canSprint)
         {
@@ -206,7 +206,7 @@ public class PlayerController : MonoBehaviour
 
         if (controller.isGrounded)
         {
-            // Ground movement
+            
             moveDirection = transform.TransformDirection(new Vector3(Input.GetAxis("Horizontal"), 0, Input.GetAxis("Vertical")));
             moveDirection = moveDirection.normalized * currentSpeed;
 
@@ -256,7 +256,7 @@ public class PlayerController : MonoBehaviour
         {
             footstepTimer -= Time.deltaTime;
 
-            // Determine the current footstep interval
+            
             float currentFootstepInterval = walkFootstepInterval;
             if (isSprinting)
             {
@@ -264,14 +264,14 @@ public class PlayerController : MonoBehaviour
             }
             else if (isCrouching)
             {
-                currentFootstepInterval = crouchFootstepInterval; // Use crouch footstep interval
+                currentFootstepInterval = crouchFootstepInterval; 
             }
 
             if (footstepTimer <= 0)
             {
                 footstepTimer = currentFootstepInterval;
 
-                // Randomly select a footstep sound from the array
+               
                 if (footstepSounds.Length > 0)
                 {
                     int index = Random.Range(0, footstepSounds.Length);
@@ -321,7 +321,7 @@ public class PlayerController : MonoBehaviour
                         doorAnimator.SetBool("IsIdle", true);
                     }
 
-                    isAnimating = true; // Set flag to indicate animation is playing
+                    isAnimating = true; 
                 }
             }
         }
@@ -374,13 +374,13 @@ public class PlayerController : MonoBehaviour
             float horizontal = 0f;
             float vertical = 0f;
 
-            // Check for movement inputs
+            
             if (controller.isGrounded)
             {
                 float moveForward = Input.GetAxis("Vertical");
                 float moveSideways = Input.GetAxis("Horizontal");
 
-                // Determine Vertical Float
+                
                 if (moveForward > 0)
                 {
                     vertical = isSprinting ? 1f : 0.5f; // Running forward or walking forward
@@ -390,7 +390,7 @@ public class PlayerController : MonoBehaviour
                     vertical = isSprinting ? -1f : -0.5f; // Running backward or walking backward
                 }
 
-                // Determine Horizontal Float
+                
                 if (moveSideways > 0)
                 {
                     horizontal = isSprinting ? 1f : 0.5f; // Running right or walking right
@@ -400,7 +400,7 @@ public class PlayerController : MonoBehaviour
                     horizontal = isSprinting ? -1f : -0.5f; // Running left or walking left
                 }
 
-                // If no movement input, set both to 0 (idle)
+                
                 if (moveForward == 0 && moveSideways == 0)
                 {
                     horizontal = 0f;
@@ -408,7 +408,7 @@ public class PlayerController : MonoBehaviour
                 }
             }
 
-            // Smoothly transition between animation states
+            
             playerAnimator.SetFloat("Horizontal", Mathf.Lerp(playerAnimator.GetFloat("Horizontal"), horizontal, Time.deltaTime * smoothTransitionSpeed));
             playerAnimator.SetFloat("Vertical", Mathf.Lerp(playerAnimator.GetFloat("Vertical"), vertical, Time.deltaTime * smoothTransitionSpeed));
         }
@@ -420,7 +420,7 @@ public class PlayerController : MonoBehaviour
     {
         if (Input.GetKeyDown(KeyCode.J))
         {
-            TakeDamage(10); // Example damage amount, adjust as needed
+            TakeDamage(10);
         }
     }
 
@@ -450,9 +450,9 @@ public class PlayerController : MonoBehaviour
 
     void Die()
     {
-        // Implement player death logic here
+        
         Debug.Log("Player has died.");
-        // Example: Reload the scene or show a game over screen
+       
     }
 
     IEnumerator FadeCanvasGroup(CanvasGroup canvasGroup, float targetAlpha, float duration)
