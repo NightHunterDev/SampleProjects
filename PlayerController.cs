@@ -1,472 +1,327 @@
+using Mirror;
 using UnityEngine;
-using UnityEngine.UI;
-using TMPro; 
-using System.Collections;
 
-public class PlayerController : MonoBehaviour
+public class PlayerController : NetworkBehaviour
 {
-    [Header("Movement Settings")]
-    public float walkSpeed = 6.0f;
-    public float sprintSpeed = 12.0f;
-    public float crouchSpeed = 3.0f; 
-    public float jumpSpeed = 8.0f;
-    public float gravity = 20.0f;
-    public float airControlFactor = 0.5f;
+    [Header("Movement & Camera Rotation")]
+    public float walkSpeed = 5f;
+    public float sprintSpeed = 10f;
+    public float slowWalkSpeed = 2f;
+    public float mouseSensitivity = 100f;
+    public Camera playerCamera;  
 
+    [Header("Third Person Animations")]
+    public Animator animator;  // Animator component
+    public float animationDampTime = 0.1f; 
+    public GameObject playerGameObject; 
 
-    // This Can Be Used To Change Player Scale By Commands
-    [Header("Player Scale")]
-    public GameObject playerObject; 
-    public Vector3 playerScale = new Vector3(1, 1, 1); 
+    [Header("Footsteps")]
+    public AudioSource footstepAudioSource;  
+    public AudioClip[] footstepClips;  
+    public float walkStepInterval = 0.5f;  
+    public float sprintStepInterval = 0.3f;  
+    public float slowWalkStepInterval = 0.7f;  
 
+    public float gravity = -9.81f;  
+    public float fallSpeed = 0f;  
 
-    [Header("Mouse Settings")]
-    public float mouseSensitivity = 100.0f;
-    public Transform playerCamera;
-    public float maxLookAngle = 85.0f;
-
-    [Header("Footsteps Settings")]
-    public AudioClip[] footstepSounds;
-    public AudioSource footstepSource;
-    public float walkFootstepInterval = 0.5f;
-    public float sprintFootstepInterval = 0.3f;
-    public float crouchFootstepInterval = 0.6f; 
-
-    [Header("Stamina Settings")]
-    public Slider staminaSlider; 
-    public GameObject staminaUI; 
-    public float maxStamina = 11.0f;
-    public float staminaRegenRate = 1.0f;
-    public float staminaFadeDuration = 0.5f;
-    public float jumpStaminaCost = 1.0f;
-    public float staminaThreshold = 0.159f; // Threshold to allow player to sprint again
-
-    [Header("Class & Spawning Animation")]
-    public AnimationClip spawningAnimation;
-    public AudioClip spawningAudioClip;
-    public AudioSource spawningAudioSource;
-
-    [Header("Player List")]
-    public GameObject playerListUI; 
-    public float playerListFadeDuration = 0.5f;
-
-    [Header("Third Person Player Model")]
-    public Animator playerAnimator; 
-    public float smoothTransitionSpeed = 5.0f; // Speed of smooth transition between animations in the blend tree
-    public float animationSpeed = 1.0f; 
-
-
-    [Header("Door Controller")]
-    public Animator doorAnimator; 
-    public AudioSource doorAudioSource; 
-    public AudioClip openDoorClip; 
-    public AudioClip closeDoorClip; 
-    private bool isDoorOpen = false; 
-    private bool isAnimating = false; 
-
-    [Header("Health & Death")]
-    public float maxHealth = 100.0f;
-    public Slider healthSlider; 
-    public TextMeshProUGUI healthText; 
-    private float currentHealth;
-
+    private float currentSpeed;
+    private float xRotation = 0f;
     private CharacterController controller;
-    private Vector3 moveDirection = Vector3.zero;
-    private float verticalVelocity = 0.0f;
-    private float rotationX = 0;
-    private float footstepTimer = 0.0f;
-    private float currentStamina;
-    private bool isSprinting;
-    private bool isCrouching;
-    private CanvasGroup staminaCanvasGroup; 
-    private CanvasGroup playerListCanvasGroup; 
-    private float currentLeanAngle = 0.0f;
+    private float verticalVelocity;
+    private float horizontalVelocity;
 
+    private float stepTimer = 0f;
+    private bool isSprinting = false;
+    private bool isSlowWalking = false;
 
+    
+    [SyncVar(hook = nameof(OnVerticalChanged))]
+    private float syncVertical;
 
+    [SyncVar(hook = nameof(OnHorizontalChanged))]
+    private float syncHorizontal;
 
     void Start()
     {
         controller = GetComponent<CharacterController>();
-        currentStamina = maxStamina;
-        staminaSlider.maxValue = maxStamina;
-        staminaSlider.value = maxStamina;
+
+        if (controller == null)
+        {
+            Debug.LogError("PlayerController: CharacterController component is missing.");
+            return;
+        }
+
+        if (playerCamera == null)
+        {
+            Debug.LogError("PlayerController: No camera assigned. Please assign a camera in the Inspector.");
+            return;
+        }
+
+        if (animator == null)
+        {
+            Debug.LogError("PlayerController: Animator component is missing. Please assign it in the Inspector.");
+            return;
+        }
+
+        if (footstepAudioSource == null || footstepClips.Length == 0)
+        {
+            Debug.LogError("PlayerController: AudioSource or footstep clips are missing. Please assign them in the Inspector.");
+            return;
+        }
+
+        if (playerGameObject == null)
+        {
+            Debug.LogError("PlayerController: Player GameObject is missing. Please assign it in the Inspector.");
+            return;
+        }
 
         
-        currentHealth = maxHealth;
-        healthSlider.maxValue = maxHealth;
-        healthSlider.value = currentHealth;
-        UpdateHealthText();
-
-
+        playerCamera.enabled = false;
 
         
+        var audioListener = playerCamera.GetComponent<AudioListener>();
+        if (audioListener != null)
+        {
+            audioListener.enabled = false;
+        }
+
         Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
 
-        // Play Spawn animation and audio
-        if (spawningAnimation != null)
+        
+        if (isLocalPlayer)
         {
-            GetComponent<Animator>().Play(spawningAnimation.name);
+            OnStartLocalPlayer();
         }
-        if (spawningAudioSource != null && spawningAudioClip != null)
+    }
+
+    public override void OnStartLocalPlayer()
+    {
+        base.OnStartLocalPlayer();
+
+        
+        playerCamera.enabled = true;
+
+        
+        var audioListener = playerCamera.GetComponent<AudioListener>();
+        if (audioListener != null)
         {
-            spawningAudioSource.clip = spawningAudioClip;
-            spawningAudioSource.Play();
+            audioListener.enabled = true;
         }
 
         
-        if (staminaUI != null)
-        {
-            staminaCanvasGroup = staminaUI.GetComponent<CanvasGroup>();
-            if (staminaCanvasGroup == null)
-            {
-                // If CanvasGroup is not attached, add one
-                staminaCanvasGroup = staminaUI.AddComponent<CanvasGroup>();
-            }
-        }
+        SetPlayerVisibility(false);
 
-        if (playerListUI != null)
-        {
-            playerListCanvasGroup = playerListUI.GetComponent<CanvasGroup>();
-            if (playerListCanvasGroup == null)
-            {
-                
-                playerListCanvasGroup = playerListUI.AddComponent<CanvasGroup>();
-            }
-            playerListCanvasGroup.alpha = 0; 
-        }
-
-       
-        if (playerAnimator != null)
-        {
-            playerAnimator.speed = animationSpeed;
-        }
-
-
-        // Ensure the door starts in the idle state
-        if (doorAnimator != null)
-        {
-            doorAnimator.SetBool("IsIdle", true);
-        }
-
-        // Set the player  scale at the start of the game
-        if (playerObject != null)
-        {
-            playerObject.transform.localScale = playerScale;
-        }
+        
+        playerCamera.cullingMask &= ~(1 << LayerMask.NameToLayer("Player"));
     }
 
     void Update()
     {
+        if (!isLocalPlayer) return; // Only process input for the local player
+
         HandleMovement();
-        HandleMouseLook();
+        HandleCameraRotation();
         HandleFootsteps();
-        HandleStamina();
-        HandlePlayerList();
         HandleAnimations();
-        HandleHealthAndDeath(); 
-        HandleDoorControl();
-
-        
-        if (isAnimating && !doorAnimator.GetCurrentAnimatorStateInfo(0).IsName("Opening") &&
-            !doorAnimator.GetCurrentAnimatorStateInfo(0).IsName("Closing"))
-        {
-            isAnimating = false;
-        }
-
-        
-        if (playerObject != null)
-        {
-            playerObject.transform.localScale = playerScale;
-        }
     }
-
-
 
     void HandleMovement()
     {
-        bool isMoving = Input.GetAxis("Horizontal") != 0 || Input.GetAxis("Vertical") != 0;
-        bool canSprint = currentStamina > staminaThreshold && isMoving;
-        float currentSpeed = walkSpeed;
-        isSprinting = false;
-
-        if (isCrouching)
-        {
-            currentSpeed = crouchSpeed; 
-        }
-        else if (Input.GetKey(KeyCode.LeftShift) && canSprint)
+        
+        if (Input.GetKey(KeyCode.LeftShift))
         {
             currentSpeed = sprintSpeed;
             isSprinting = true;
+            isSlowWalking = false;
+        }
+        else if (Input.GetKey(KeyCode.LeftControl))
+        {
+            currentSpeed = slowWalkSpeed;
+            isSprinting = false;
+            isSlowWalking = true;
         }
         else
         {
             currentSpeed = walkSpeed;
+            isSprinting = false;
+            isSlowWalking = false;
         }
 
+        
+        float moveX = Input.GetAxis("Horizontal");
+        float moveZ = Input.GetAxis("Vertical");
+
+        
+        Vector3 move = transform.right * moveX + transform.forward * moveZ;
+
+        
+        Vector3 moveDirection = move * currentSpeed * Time.deltaTime;
+
+        // Apply gravity
+        fallSpeed += gravity * Time.deltaTime;
+        moveDirection.y = fallSpeed;
+
+        // Apply movement and gravity
+        controller.Move(moveDirection);
+
+        
         if (controller.isGrounded)
         {
-            
-            moveDirection = transform.TransformDirection(new Vector3(Input.GetAxis("Horizontal"), 0, Input.GetAxis("Vertical")));
-            moveDirection = moveDirection.normalized * currentSpeed;
-
-            if (Input.GetButton("Jump"))
-            {
-                verticalVelocity = jumpSpeed;
-                if (currentStamina > 0) // Consume stamina faster when jumping
-                {
-                    currentStamina -= jumpStaminaCost;
-                    if (currentStamina < 0) currentStamina = 0;
-                }
-            }
-            else
-            {
-                verticalVelocity = 0.0f;
-            }
+            fallSpeed = 0; // Reset fall speed if grounded
         }
-        else
+
+        
+        if (isServer)
         {
-            // Air control
-            Vector3 airControl = transform.TransformDirection(new Vector3(Input.GetAxis("Horizontal"), 0, Input.GetAxis("Vertical")));
-            moveDirection.x = Mathf.Lerp(moveDirection.x, airControl.x * currentSpeed, airControlFactor);
-            moveDirection.z = Mathf.Lerp(moveDirection.z, airControl.z * currentSpeed, airControlFactor);
+            CmdUpdatePosition(transform.position, transform.rotation);
         }
-
-        verticalVelocity -= gravity * Time.deltaTime;
-        moveDirection.y = verticalVelocity;
-
-        controller.Move(moveDirection * Time.deltaTime);
     }
 
-    void HandleMouseLook()
+    void HandleCameraRotation()
     {
+        if (!isLocalPlayer) return; // Only allow local player to control the camera
+
+        
         float mouseX = Input.GetAxis("Mouse X") * mouseSensitivity * Time.deltaTime;
         float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity * Time.deltaTime;
 
-        rotationX -= mouseY;
-        rotationX = Mathf.Clamp(rotationX, -maxLookAngle, maxLookAngle);
-
-        playerCamera.localRotation = Quaternion.Euler(rotationX, 0, currentLeanAngle);
+        
         transform.Rotate(Vector3.up * mouseX);
+
+        
+        xRotation -= mouseY;
+        xRotation = Mathf.Clamp(xRotation, -90f, 90f);
+
+        playerCamera.transform.localRotation = Quaternion.Euler(xRotation, 0f, 0f);
     }
 
     void HandleFootsteps()
     {
-        if (controller.isGrounded && controller.velocity.magnitude > 0.1f && !isCrouching)
+        if (footstepAudioSource == null || footstepClips.Length == 0) return; // Exit if no audio source or clips are assigned
+
+        
+        if (controller.velocity.magnitude > 0.1f)
         {
-            footstepTimer -= Time.deltaTime;
+            stepTimer += Time.deltaTime;
 
             
-            float currentFootstepInterval = walkFootstepInterval;
-            if (isSprinting)
-            {
-                currentFootstepInterval = sprintFootstepInterval;
-            }
-            else if (isCrouching)
-            {
-                currentFootstepInterval = crouchFootstepInterval; 
-            }
+            float currentStepInterval = isSprinting ? sprintStepInterval : (isSlowWalking ? slowWalkStepInterval : walkStepInterval);
 
-            if (footstepTimer <= 0)
+            
+            if (stepTimer >= currentStepInterval)
             {
-                footstepTimer = currentFootstepInterval;
-
-               
-                if (footstepSounds.Length > 0)
+                
+                var clipToPlay = footstepClips[Random.Range(0, footstepClips.Length)];
+                if (clipToPlay != null)
                 {
-                    int index = Random.Range(0, footstepSounds.Length);
-                    footstepSource.clip = footstepSounds[index];
-                    footstepSource.Play();
+                    PlayFootstepSound(clipToPlay);
                 }
+
+                stepTimer = 0f;
             }
         }
         else
         {
-            footstepTimer = 0;
-        }
-    }
-
-    void HandleDoorControl()
-    {
-        if (doorAnimator == null || doorAudioSource == null)
-        {
-            Debug.LogError("Door Animator or Door AudioSource not assigned.");
-            return;
-        }
-
-        Ray ray = new Ray(playerCamera.position, playerCamera.forward);
-        RaycastHit hit;
-
-        if (Physics.Raycast(ray, out hit, 3.0f))
-        {
-            if (hit.collider.gameObject.layer == LayerMask.NameToLayer("HCZ_Button"))
-            {
-                if (Input.GetKeyDown(KeyCode.E) && !isAnimating)
-                {
-                    if (doorAnimator.GetBool("IsIdle"))
-                    {
-                        doorAnimator.SetBool("IsIdle", false);
-                        doorAnimator.SetBool("IsOpening", true);
-                        PlayAudioClip(openDoorClip);
-                    }
-                    else if (doorAnimator.GetBool("IsOpening"))
-                    {
-                        doorAnimator.SetBool("IsOpening", false);
-                        doorAnimator.SetBool("IsClosed", true);
-                        PlayAudioClip(closeDoorClip);
-                    }
-                    else if (doorAnimator.GetBool("IsClosed"))
-                    {
-                        doorAnimator.SetBool("IsClosed", false);
-                        doorAnimator.SetBool("IsIdle", true);
-                    }
-
-                    isAnimating = true; 
-                }
-            }
-        }
-    }
-
-
-    void PlayAudioClip(AudioClip clip)
-    {
-        if (clip != null)
-        {
-            doorAudioSource.clip = clip;
-            doorAudioSource.Play();
-        }
-    }
-
-    void HandleStamina()
-    {
-        if (isSprinting && currentStamina > 0)
-        {
-            currentStamina -= Time.deltaTime;
-            if (currentStamina < 0) currentStamina = 0;
-        }
-        else if (!isSprinting && currentStamina < maxStamina)
-        {
-            currentStamina += staminaRegenRate * Time.deltaTime;
-            if (currentStamina > maxStamina) currentStamina = maxStamina;
-        }
-
-        staminaSlider.value = currentStamina;
-
-        // Fade in/out stamina UI based on sprinting
-        if (staminaUI != null)
-        {
-            StartCoroutine(FadeCanvasGroup(staminaCanvasGroup, isSprinting ? 1 : 0, staminaFadeDuration));
-        }
-    }
-
-    void HandlePlayerList()
-    {
-        if (playerListUI != null)
-        {
-            StartCoroutine(FadeCanvasGroup(playerListCanvasGroup, 1, playerListFadeDuration));
+            stepTimer = 0f; 
         }
     }
 
     void HandleAnimations()
     {
-        if (playerAnimator != null)
+        if (animator == null) return; // Exit if no Animator is assigned
+
+        
+        float targetVertical = 0f;
+        float targetHorizontal = 0f;
+
+        
+        if (Input.GetKey(KeyCode.W))
         {
-            float horizontal = 0f;
-            float vertical = 0f;
+            targetVertical = isSprinting ? 1f : 0.5f; // Running forward if shift is held
+        }
+        else if (Input.GetKey(KeyCode.S))
+        {
+            targetVertical = isSprinting ? -1f : -0.5f; // Running backward if shift is held
+        }
+
+        
+        if (Input.GetKey(KeyCode.D))
+        {
+            targetHorizontal = isSprinting ? 1f : 0.5f; // Strafe running right if shift is held
+        }
+        else if (Input.GetKey(KeyCode.A))
+        {
+            targetHorizontal = isSprinting ? -1f : -0.5f; // Strafe running left if shift is held
+        }
+
+        
+        verticalVelocity = Mathf.Lerp(verticalVelocity, targetVertical, animationDampTime);
+        horizontalVelocity = Mathf.Lerp(horizontalVelocity, targetHorizontal, animationDampTime);
+
+        
+        if (isLocalPlayer)
+        {
+            animator.SetFloat("Vertical", verticalVelocity);
+            animator.SetFloat("Horizontal", horizontalVelocity);
 
             
-            if (controller.isGrounded)
-            {
-                float moveForward = Input.GetAxis("Vertical");
-                float moveSideways = Input.GetAxis("Horizontal");
-
-                
-                if (moveForward > 0)
-                {
-                    vertical = isSprinting ? 1f : 0.5f; // Running forward or walking forward
-                }
-                else if (moveForward < 0)
-                {
-                    vertical = isSprinting ? -1f : -0.5f; // Running backward or walking backward
-                }
-
-                
-                if (moveSideways > 0)
-                {
-                    horizontal = isSprinting ? 1f : 0.5f; // Running right or walking right
-                }
-                else if (moveSideways < 0)
-                {
-                    horizontal = isSprinting ? -1f : -0.5f; // Running left or walking left
-                }
-
-                
-                if (moveForward == 0 && moveSideways == 0)
-                {
-                    horizontal = 0f;
-                    vertical = 0f;
-                }
-            }
-
-            
-            playerAnimator.SetFloat("Horizontal", Mathf.Lerp(playerAnimator.GetFloat("Horizontal"), horizontal, Time.deltaTime * smoothTransitionSpeed));
-            playerAnimator.SetFloat("Vertical", Mathf.Lerp(playerAnimator.GetFloat("Vertical"), vertical, Time.deltaTime * smoothTransitionSpeed));
+            syncVertical = verticalVelocity;
+            syncHorizontal = horizontalVelocity;
         }
     }
 
     
-
-    void HandleHealthAndDeath()
+    void OnVerticalChanged(float oldValue, float newValue)
     {
-        if (Input.GetKeyDown(KeyCode.J))
+        if (!isLocalPlayer)
         {
-            TakeDamage(10);
+            animator.SetFloat("Vertical", newValue);
         }
     }
 
-    public void TakeDamage(float amount)
+    void OnHorizontalChanged(float oldValue, float newValue)
     {
-        currentHealth -= amount;
-        if (currentHealth < 0) currentHealth = 0;
-
-        healthSlider.value = currentHealth;
-        UpdateHealthText();
-
-        // Check for death condition
-        if (currentHealth <= 0)
+        if (!isLocalPlayer)
         {
-            // Handle player death
-            Die();
+            animator.SetFloat("Horizontal", newValue);
         }
     }
 
-    void UpdateHealthText()
+    [Command]
+    void CmdUpdatePosition(Vector3 position, Quaternion rotation)
     {
-        if (healthText != null)
+        RpcUpdatePosition(position, rotation);
+    }
+
+    [ClientRpc]
+    void RpcUpdatePosition(Vector3 position, Quaternion rotation)
+    {
+        if (!isLocalPlayer)
         {
-            healthText.text = $"{currentHealth} / {maxHealth}";
+            transform.position = Vector3.Lerp(transform.position, position, Time.deltaTime * 10);
+            transform.rotation = Quaternion.Lerp(transform.rotation, rotation, Time.deltaTime * 10);
         }
     }
 
-    void Die()
+    void SetPlayerVisibility(bool isVisible)
     {
-        
-        Debug.Log("Player has died.");
-       
+        if (playerGameObject != null)
+        {
+            Renderer[] renderers = playerGameObject.GetComponentsInChildren<Renderer>();
+            foreach (Renderer renderer in renderers)
+            {
+                renderer.enabled = isVisible;
+            }
+        }
     }
 
-    IEnumerator FadeCanvasGroup(CanvasGroup canvasGroup, float targetAlpha, float duration)
+    void PlayFootstepSound(AudioClip clip)
     {
-        float startAlpha = canvasGroup.alpha;
-        float elapsed = 0;
-
-        while (elapsed < duration)
+        if (clip != null)
         {
-            elapsed += Time.deltaTime;
-            canvasGroup.alpha = Mathf.Lerp(startAlpha, targetAlpha, elapsed / duration);
-            yield return null;
+            footstepAudioSource.PlayOneShot(clip);
         }
-
-        canvasGroup.alpha = targetAlpha;
     }
 }
